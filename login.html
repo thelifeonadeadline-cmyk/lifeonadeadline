@@ -16,6 +16,7 @@
       justify-content: center;
       height: 100vh;
     }
+
     .login-container {
       background-color: white;
       color: #333;
@@ -26,15 +27,72 @@
       width: 90%;
       text-align: center;
     }
-    h2 { margin-bottom: 1rem; font-weight: 600; color: #4B0082; }
-    input { width: 100%; padding: 0.75rem; margin: 0.7rem 0; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
-    button { width: 100%; padding: 0.9rem; background-color: #4B0082; color: white; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; margin-top: 1rem; }
-    button:hover { background-color: #6A5ACD; }
-    .google-btn { background: #fff; color: #000; display: flex; align-items: center; justify-content: center; gap: .5rem; font-weight: 600; border: 1px solid #ccc; margin-top: 0.8rem; }
-    .google-btn img { width: 20px; height: 20px; }
-    .forgot-link, .signup-link { display: block; margin-top: 1rem; color: #4B0082; text-decoration: none; font-weight: bold; }
-    .forgot-link:hover, .signup-link:hover { text-decoration: underline; }
-    #msg { margin-top: 1rem; font-weight: 500; }
+
+    h2 {
+      margin-bottom: 1rem;
+      font-weight: 600;
+      color: #4B0082;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.75rem;
+      margin: 0.7rem 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    button {
+      width: 100%;
+      padding: 0.9rem;
+      background-color: #4B0082;
+      color: white;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin-top: 1rem;
+    }
+
+    button:hover {
+      background-color: #6A5ACD;
+    }
+
+    .google-btn {
+      background: #fff;
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      font-weight: 600;
+      border: 1px solid #ccc;
+      margin-top: 0.8rem;
+    }
+
+    .google-btn img {
+      width: 20px;
+      height: 20px;
+    }
+
+    .forgot-link, .signup-link {
+      display: block;
+      margin-top: 1rem;
+      color: #4B0082;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .forgot-link:hover, .signup-link:hover {
+      text-decoration: underline;
+    }
+
+    #msg {
+      margin-top: 1rem;
+      font-weight: 500;
+    }
   </style>
 </head>
 <body>
@@ -60,92 +118,120 @@
 </div>
 
 <script type="module">
-import { auth, db } from './firebase-config.js';
-import { signInWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
-import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+  import { auth, db } from './firebase-config.js';
+  import {
+    signInWithEmailAndPassword,
+    onAuthStateChanged,
+    sendPasswordResetEmail,
+    GoogleAuthProvider,
+    signInWithPopup,
+    confirmPasswordReset,
+    verifyPasswordResetCode
+  } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+  import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
-const loginForm = document.getElementById('loginForm');
-const emailInput = document.getElementById('email');
-const passwordInput = document.getElementById('password');
-const msg = document.getElementById('msg');
-const forgotLink = document.getElementById('forgotPassword');
-const loginBtn = document.getElementById('loginBtn');
-const googleBtn = document.getElementById('googleLogin');
+  const loginForm = document.getElementById('loginForm');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const msg = document.getElementById('msg');
+  const forgotLink = document.getElementById('forgotPassword');
+  const loginBtn = document.getElementById('loginBtn');
+  const googleBtn = document.getElementById('googleLogin');
 
-function showMsg(text, color='green') {
-  msg.style.color = color;
-  msg.textContent = text;
-}
-
-// Redirect if already logged in
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    setTimeout(() => window.location.href = 'index.html', 100);
+  function showMsg(text, color='green') {
+    msg.style.color = color;
+    msg.textContent = text;
   }
-});
 
-// Email/password login
-loginForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  showMsg('');
-  loginBtn.disabled = true;
-  try {
-    const credential = await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-    await handleUser(credential.user);
-    showMsg('✅ Login successful! Redirecting...', 'green');
-    setTimeout(() => window.location.href = 'index.html', 700);
-  } catch (error) {
-    let text = error.message;
-    if (error.code === 'auth/wrong-password') text = 'Incorrect password.';
-    if (error.code === 'auth/user-not-found') text = 'No account found with that email.';
-    showMsg(text, 'red');
-  } finally {
-    loginBtn.disabled = false;
-  }
-});
+  // Handle Password Reset if URL has oobCode
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get('mode');
+  const oobCode = urlParams.get('oobCode');
 
-// Google Login
-googleBtn.addEventListener('click', async () => {
-  try {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    await handleUser(result.user);
-    showMsg('✅ Google login successful! Redirecting...', 'green');
-    setTimeout(() => window.location.href = 'index.html', 700);
-  } catch (error) {
-    console.error('Google sign-in error:', error);
-    showMsg(error.message, 'red');
+  if (mode === 'resetPassword' && oobCode) {
+    const newPassword = prompt("Enter your new password:");
+    if (newPassword) {
+      confirmPasswordReset(auth, oobCode, newPassword)
+        .then(() => {
+          alert("✅ Password successfully updated! Please log in with your new password.");
+          window.location.href = 'login.html';
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Error updating password. Try the link again.");
+        });
+    }
   }
-});
 
-// Forgot password
-forgotLink.addEventListener('click', async (e) => {
-  e.preventDefault();
-  let email = emailInput.value.trim();
-  if (!email) email = prompt('Enter your account email:');
-  if (!email) return;
-  try {
-    await sendPasswordResetEmail(auth, email, {
-      url: 'https://thelifeonadeadline-cmyk.github.io/lifeonadeadline/login.html'
-    });
-    showMsg('✅ Password reset email sent! Check your inbox.', 'green');
-  } catch (err) {
-    let friendly = err.message;
-    if (err.code === 'auth/user-not-found') friendly = 'No account with that email.';
-    showMsg(friendly, 'red');
-  }
-});
+  // Auto redirect if already logged in
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      setTimeout(() => window.location.href = 'index.html', 100);
+    }
+  });
 
-// Store user in Firestore
-async function handleUser(user) {
-  const ref = doc(db, 'users', user.uid);
-  const snap = await getDoc(ref);
-  let name = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
-  if (!snap.exists()) {
-    await setDoc(ref, { name, email: user.email, joinedAt: new Date() });
+  // Email/Password Login
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    showMsg('');
+    loginBtn.disabled = true;
+    try {
+      const credential = await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
+      await handleUser(credential.user);
+      showMsg('✅ Login successful! Redirecting...', 'green');
+      setTimeout(() => window.location.href = 'index.html', 700);
+    } catch (error) {
+      let text = error.message;
+      if (error.code === 'auth/wrong-password') text = 'Incorrect password.';
+      if (error.code === 'auth/user-not-found') text = 'No account found with that email.';
+      showMsg(text, 'red');
+    } finally {
+      loginBtn.disabled = false;
+    }
+  });
+
+  // Google Login
+  googleBtn.addEventListener('click', async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      await handleUser(result.user);
+      showMsg('✅ Google login successful! Redirecting...', 'green');
+      setTimeout(() => window.location.href = 'index.html', 700);
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      showMsg(error.message, 'red');
+    }
+  });
+
+  // Forgot Password
+  forgotLink.addEventListener('click', async (e) => {
+    e.preventDefault();
+    let email = emailInput.value.trim();
+    if (!email) email = prompt('Enter your account email:');
+    if (!email) return;
+    try {
+      await sendPasswordResetEmail(auth, email, {
+        url: 'https://thelifeonadeadline-cmyk.github.io/lifeonadeadline/login.html'
+      });
+      showMsg('✅ Password reset email sent. Check your inbox.', 'green');
+    } catch (err) {
+      let friendly = err.message;
+      if (err.code === 'auth/user-not-found') friendly = 'No account with that email.';
+      showMsg(friendly, 'red');
+    }
+  });
+
+  // Save user to Firestore
+  async function handleUser(user) {
+    const ref = doc(db, 'users', user.uid);
+    const snap = await getDoc(ref);
+    let name = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
+    if (!snap.exists()) {
+      await setDoc(ref, { name, email: user.email, joinedAt: new Date() });
+    }
+    localStorage.setItem('displayName', name);
   }
-  localStorage.setItem('displayName', name);
-}
 </script>
 
 </body>
