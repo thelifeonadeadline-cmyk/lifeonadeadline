@@ -212,27 +212,30 @@ forgotLink.addEventListener('click', async e => {
 async function handleUser(user){
   const ref = doc(db,'users',user.uid);
   const snap = await getDoc(ref);
-  if(!snap.exists() || !snap.data().name){
-    nameContainer.style.display='block';
+
+  let name = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
+
+  if(!snap.exists()){
+    // New user: create document with name
+    await setDoc(ref,{ name, email:user.email, joinedAt:new Date() });
+    localStorage.setItem('displayName', name);
+    window.location.href = 'index.html'; // redirect for new users
   } else {
-    localStorage.setItem('displayName', snap.data().name);
-    window.location.href='index.html';
+    const userData = snap.data();
+    if(!userData.name){
+      // Existing user without name: show input
+      nameContainer.style.display = 'block';
+      showMsg('Please enter your name to continue.', 'blue');
+    } else {
+      // User already has a name: redirect
+      localStorage.setItem('displayName', userData.name);
+      window.location.href='index.html';
+    }
   }
 }
 
-// Save name for existing users
-saveNameBtn.addEventListener('click', async () => {
-  const user = auth.currentUser;
-  if(!user) return;
-  const name = nameInput.value.trim();
-  if(!name){ showMsg('Please enter a valid name.','red'); return; }
-  const ref = doc(db,'users',user.uid);
-  await setDoc(ref,{ name, email:user.email, joinedAt:new Date() },{ merge:true });
-  localStorage.setItem('displayName', name);
-  showMsg(`✅ Name saved as "${name}". Redirecting...`,'green');
-  setTimeout(()=>window.location.href='index.html',1000);
-});
 </script>
 
 </body>
 </html>
+
