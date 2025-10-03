@@ -16,6 +16,7 @@
       justify-content: center;
       height: 100vh;
     }
+
     .login-container {
       background-color: white;
       color: #333;
@@ -26,11 +27,13 @@
       width: 90%;
       text-align: center;
     }
+
     h2 {
       margin-bottom: 1rem;
       font-weight: 600;
       color: #4B0082;
     }
+
     input {
       width: 100%;
       padding: 0.75rem;
@@ -39,6 +42,7 @@
       border-radius: 8px;
       font-size: 1rem;
     }
+
     button {
       width: 100%;
       padding: 0.9rem;
@@ -51,9 +55,11 @@
       font-size: 1rem;
       margin-top: 1rem;
     }
+
     button:hover {
       background-color: #6A5ACD;
     }
+
     .google-btn {
       background: #fff;
       color: #000;
@@ -65,10 +71,12 @@
       border: 1px solid #ccc;
       margin-top: 0.8rem;
     }
+
     .google-btn img {
       width: 20px;
       height: 20px;
     }
+
     .forgot-link, .signup-link {
       display: block;
       margin-top: 1rem;
@@ -76,14 +84,20 @@
       text-decoration: none;
       font-weight: bold;
     }
+
     .forgot-link:hover, .signup-link:hover {
       text-decoration: underline;
     }
+
     #msg {
       margin-top: 1rem;
       font-weight: 500;
     }
-    #nameContainer { display:none; margin-top:1rem; }
+
+    #nameContainer {
+      display: none;
+      margin-top: 1rem;
+    }
   </style>
 </head>
 <body>
@@ -114,128 +128,148 @@
 </div>
 
 <script type="module">
-import { auth, db } from './firebase-config.js';
-import { 
-  signInWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, 
-  GoogleAuthProvider, signInWithPopup, confirmPasswordReset
-} from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
-import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+  import { auth, db } from './firebase-config.js';
+  import {
+    signInWithEmailAndPassword,
+    onAuthStateChanged,
+    sendPasswordResetEmail,
+    GoogleAuthProvider,
+    signInWithPopup,
+    confirmPasswordReset
+  } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+  import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
-const loginForm = document.getElementById('loginForm');
-const emailInput = document.getElementById('email');
-const passwordInput = document.getElementById('password');
-const msg = document.getElementById('msg');
-const forgotLink = document.getElementById('forgotPassword');
-const loginBtn = document.getElementById('loginBtn');
-const googleBtn = document.getElementById('googleLogin');
-const nameContainer = document.getElementById('nameContainer');
-const nameInput = document.getElementById('nameInput');
-const saveNameBtn = document.getElementById('saveNameBtn');
+  const loginForm = document.getElementById('loginForm');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const msg = document.getElementById('msg');
+  const forgotLink = document.getElementById('forgotPassword');
+  const loginBtn = document.getElementById('loginBtn');
+  const googleBtn = document.getElementById('googleLogin');
 
-function showMsg(text, color='green') {
-  msg.style.color = color;
-  msg.textContent = text;
-}
+  const nameContainer = document.getElementById('nameContainer');
+  const nameInput = document.getElementById('nameInput');
+  const saveNameBtn = document.getElementById('saveNameBtn');
 
-// Handle password reset if URL contains oobCode
-const urlParams = new URLSearchParams(window.location.search);
-const mode = urlParams.get('mode');
-const oobCode = urlParams.get('oobCode');
-
-if(mode === 'resetPassword' && oobCode){
-  const newPassword = prompt("Enter your new password:");
-  if(newPassword){
-    confirmPasswordReset(auth, oobCode, newPassword)
-      .then(()=> {
-        alert("✅ Password updated! Please log in with your new password.");
-        window.location.href='login.html';
-      })
-      .catch(err=>{
-        console.error(err);
-        alert("Error updating password. Try the link again.");
-      });
+  function showMsg(text, color='green'){
+    msg.style.color = color;
+    msg.textContent = text;
   }
-}
 
-// Redirect if already logged in
-onAuthStateChanged(auth, user => {
-  if(user) window.location.href = 'index.html';
-});
-
-// Handle email/password login
-loginForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  showMsg('');
-  loginBtn.disabled = true;
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value);
-    await handleUser(userCredential.user);
-  } catch(err){
-    let text = err.message;
-    if(err.code==='auth/wrong-password') text='Incorrect password.';
-    if(err.code==='auth/user-not-found') text='No account found with that email.';
-    showMsg(text,'red');
-  } finally { loginBtn.disabled=false; }
-});
-
-// Handle Google login
-googleBtn.addEventListener('click', async () => {
-  try {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    await handleUser(result.user);
-  } catch(err){
-    console.error(err);
-    showMsg(err.message,'red');
-  }
-});
-
-// Forgot password
-forgotLink.addEventListener('click', async e => {
-  e.preventDefault();
-  let email = emailInput.value.trim();
-  if(!email) email = prompt("Enter your account email:");
-  if(!email) return;
-  try{
-    await sendPasswordResetEmail(auth, email, {
-      url: 'https://thelifeonadeadline-cmyk.github.io/lifeonadeadline/login.html'
-    });
-    showMsg('✅ Password reset email sent. Check your inbox.','green');
-  }catch(err){
-    let friendly = err.message;
-    if(err.code==='auth/user-not-found') friendly='No account with that email.';
-    showMsg(friendly,'red');
-  }
-});
-
-// Save user to Firestore and handle missing name
-async function handleUser(user){
-  const ref = doc(db,'users',user.uid);
-  const snap = await getDoc(ref);
-
-  let name = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
-
-  if(!snap.exists()){
-    // New user: create document with name
-    await setDoc(ref,{ name, email:user.email, joinedAt:new Date() });
-    localStorage.setItem('displayName', name);
-    window.location.href = 'index.html'; // redirect for new users
-  } else {
-    const userData = snap.data();
-    if(!userData.name){
-      // Existing user without name: show input
-      nameContainer.style.display = 'block';
-      showMsg('Please enter your name to continue.', 'blue');
-    } else {
-      // User already has a name: redirect
-      localStorage.setItem('displayName', userData.name);
-      window.location.href='index.html';
+  // Handle password reset from email link
+  const urlParams = new URLSearchParams(window.location.search);
+  const mode = urlParams.get('mode');
+  const oobCode = urlParams.get('oobCode');
+  if(mode==='resetPassword' && oobCode){
+    const newPassword = prompt("Enter your new password:");
+    if(newPassword){
+      confirmPasswordReset(auth, oobCode, newPassword)
+        .then(()=>{
+          alert("✅ Password updated! Please log in with new password.");
+          window.location.href='login.html';
+        })
+        .catch(err=>{
+          console.error(err);
+          alert("Error updating password. Try the link again.");
+        });
     }
   }
-}
+
+  // Auto redirect if already logged in
+  onAuthStateChanged(auth, user=>{
+    if(user){
+      setTimeout(()=>window.location.href='index.html',100);
+    }
+  });
+
+  // Login with email/password
+  loginForm.addEventListener('submit', async e=>{
+    e.preventDefault();
+    showMsg('');
+    loginBtn.disabled = true;
+    try{
+      const credential = await signInWithEmailAndPassword(auth,emailInput.value,passwordInput.value);
+      await handleUser(credential.user);
+    } catch(err){
+      let text = err.message;
+      if(err.code==='auth/wrong-password') text='Incorrect password.';
+      if(err.code==='auth/user-not-found') text='No account found with that email.';
+      showMsg(text,'red');
+    } finally{
+      loginBtn.disabled=false;
+    }
+  });
+
+  // Google login
+  googleBtn.addEventListener('click', async ()=>{
+    try{
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth,provider);
+      await handleUser(result.user);
+    } catch(err){
+      console.error(err);
+      showMsg(err.message,'red');
+    }
+  });
+
+  // Forgot password
+  forgotLink.addEventListener('click', async e=>{
+    e.preventDefault();
+    let email = emailInput.value.trim();
+    if(!email) email = prompt('Enter your account email:');
+    if(!email) return;
+    try{
+      await sendPasswordResetEmail(auth,email,{
+        url:'https://thelifeonadeadline-cmyk.github.io/lifeonadeadline/login.html'
+      });
+      showMsg('✅ Password reset email sent. Check your inbox.','green');
+    } catch(err){
+      let friendly = err.message;
+      if(err.code==='auth/user-not-found') friendly='No account with that email.';
+      showMsg(friendly,'red');
+    }
+  });
+
+  // Handle Firestore user and name
+  async function handleUser(user){
+    const ref = doc(db,'users',user.uid);
+    const snap = await getDoc(ref);
+    let defaultName = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
+
+    if(!snap.exists()){
+      await setDoc(ref,{name:defaultName,email:user.email,joinedAt:new Date()});
+      localStorage.setItem('displayName',defaultName);
+      window.location.href='index.html';
+    } else {
+      const userData = snap.data();
+      if(!userData.name){
+        // Show name input
+        nameContainer.style.display='block';
+        showMsg('Please enter your name to continue.','blue');
+      } else {
+        localStorage.setItem('displayName',userData.name);
+        window.location.href='index.html';
+      }
+    }
+  }
+
+  // Save name for users who didn't have it
+  saveNameBtn.addEventListener('click', async ()=>{
+    const user = auth.currentUser;
+    if(!user) return;
+    const name = nameInput.value.trim();
+    if(!name){
+      showMsg('Please enter a valid name.','red');
+      return;
+    }
+    const ref = doc(db,'users',user.uid);
+    await setDoc(ref,{name,email:user.email,joinedAt:new Date()},{merge:true});
+    localStorage.setItem('displayName',name);
+    showMsg(`✅ Name saved as "${name}". Redirecting...`,'green');
+    setTimeout(()=>window.location.href='index.html',1000);
+  });
 
 </script>
 
 </body>
 </html>
-
